@@ -23,7 +23,7 @@ tool : DeDup
 use: deduplication
 command line: 
 
-tool : MapDamage
+tool : MapDamage https://ginolhac.github.io/mapDamage/
 use: quantify damage patterns (C to T substitutions because of C deamination) --> use to rescale per base quality score
 command line: 
 (check relationship with sample age)
