@@ -13,6 +13,10 @@ Compare mean fragment size between between sets of herbarium sequence data AND b
 
 
 ### Check that all files were downloaded correctly from Novogene
+An MD5 checksum is a 32-character hexadecimal number that is computed on
+a file. If two files have the same MD5 checksum value, it is highly probable that
+the two files are the same. It is generally used to check data integrity.
+
 ```
 #check the md5 string, printed to the screen ("OK")
 for dir in ./*
@@ -21,13 +25,44 @@ do
     md5sum -c MD5.txt 
     cd ../
 done
-
+#all samples looked good.
 ```
 
-It looks like sample 40 failed - download again
+
 tool: fastp
-use: remove adapters, poly Q tails, merge reads
-command line: 
+use: remove adapters, poly Q tails, merge reads (important for short frags)
+command line: herbarium_pipeline.sh sample ref_genome 
+#sample is in the first positional argument in the bash script
+
+```
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner
+
+
+cd /scratch/midway2/rozennpineau/herbarium_partial_lane/raw
+
+for dir in ./* ; do
+    cd "$dir" || continue
+
+    for r1 in *_1.fq.gz; do
+        prefx=${r1%_1.fq.gz}
+
+        fastp \
+            --in1 ${prefx}_1.fq.gz \
+            --in2 ${prefx}_2.fq.gz \
+            --out1 ${prefx}_1.unmerged.fq.gz \
+            --out2 ${prefx}_2.unmerged.fq.gz \
+            --merge \
+            --merged_out ${prefx}.collapsed.gz
+    done
+
+    cd ..
+done
+```
+
+run: herbarium_pipeline.sh
 
 tool : bwamem
 use: mapping
