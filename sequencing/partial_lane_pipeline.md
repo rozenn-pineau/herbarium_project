@@ -11,6 +11,20 @@ Comparison of the number of duplicates between sets of herbarium sequence data A
 
 Compare mean fragment size between between sets of herbarium sequence data AND between sample quality/concentrations. 
 
+
+### Check that all files were downloaded correctly from Novogene
+```
+#check the md5 string, printed to the screen ("OK")
+for dir in ./*
+do
+    cd $dir
+    md5sum -c MD5.txt 
+    cd ../
+done
+
+```
+
+It looks like sample 40 failed - download again
 tool: fastp
 use: remove adapters, poly Q tails, merge reads
 command line: 
