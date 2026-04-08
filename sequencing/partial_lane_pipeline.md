@@ -11,6 +11,11 @@ Comparison of the number of duplicates between sets of herbarium sequence data A
 
 Compare mean fragment size between between sets of herbarium sequence data AND between sample quality/concentrations. 
 
+### Software versions
+```
+#fastp version 0.23.4
+#bwamem2-2.2.1
+```
 
 ### Check that all files were downloaded correctly from Novogene
 An MD5 checksum is a 32-character hexadecimal number that is computed on
@@ -62,7 +67,13 @@ for dir in ./* ; do
 done
 ```
 
-run: herbarium_pipeline.sh
+### Map to reference genome with bwamem
+```
+
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+# 2. Map merged (collapsed) reads to Reference Genome and calculate Endogenous DNA
+bwa mem -t $threads -R "@RG\tID:$prefx\tSM:$prefx" $ref ${pathtobams}/${prefx}_1.fq.gz ${pathtobams}/${prefx}_2.fq.gz | samtools view -@ $threads -Sbh - >  /ohta2/julia.kreiner/waterhemp/herbarium/femaleref/${prefx}.uns.bam
+```
 
 tool : bwamem
 use: mapping
@@ -84,10 +95,3 @@ command line:
 
 
 
-# 4. Remove non-marked file and generate index
-mv $prefix.dd.bam $prefix.bam
-samtools index /ohta2/julia.kreiner/herbarium/femaleref/bams/${prefx}.dd.bam
-samtools flagstat /ohta2/julia.kreiner/herbarium/femaleref/bams/${prefx}.dd.bam > /ohta2/julia.kreiner/herbarium/femaleref/bams/${prefx}.stats
-
-java -jar $picard ValidateSamFile I=/ohta2/julia.kreiner/herbarium/femaleref/bams/${prefx}.final.sorted_rmdup.bam MODE=SUMMARY O=/ohta2/julia.kreiner/herbarium/femaleref/bams/${prefx}.check
-#
