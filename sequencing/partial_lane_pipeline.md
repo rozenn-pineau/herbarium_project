@@ -114,7 +114,7 @@ source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
 conda activate /project/kreiner
 
 ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
-cd /scratch/midway2/rozennpineau/herbarium_partial_lane/raw
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/raw
 
 for dir in ./* ; do
     cd "$dir" || continue
@@ -122,7 +122,7 @@ for dir in ./* ; do
     for r1 in *_1.unmerged.fq.gz; do
         prefx=${r1%_1.unmerged.fq.gz}
         # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
-        bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway2/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
+        bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
 
     done
 
@@ -130,7 +130,15 @@ for dir in ./* ; do
 
 done
 
+
+
+#explanation: align (produces sam files) bwa mem -t (number of threads) -R (read group header line) $reference_genome reads_lane1 reads_lane2
+#pipe: converts sam to bams with samtool view @ #threads -Sbh sam file input, convert to bam, with header 
+
 ```
+
+
+The fastq header corresponds to : @Instrument:RunID:FlowcellID:Lane:Tile:X:Y Read:Filter:Control:Index
 
 Custom scripts for the two remaining files that did ot make it within the 10 hours alloted for the job:
 
@@ -144,9 +152,9 @@ bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx" $ref herb449_CKDL260004902-1A_23FFGF
 
 ```
 
-### fastp files
+### Extract results from fastp files
 
-Using tje *json* block file to extract the information for each fastp report:
+Using the *json* block file to extract the information for each fastp report:
 
 ```
 
@@ -189,27 +197,23 @@ for dir in */; do
 done
 
 ```
-
-
-download to laptop to open in Chrome
-```
-scp -r rozennpineau@midway3.rcc.uchicago.edu:/scratch/midway3/rozennpineau/herbarium_partial_lane/raw/\*/\*.html /Users/rozenn/Library/CloudStorage/GoogleDrive-rozennpineau@uchicago.edu/My\ Drive/Work/9.Science/4.Herbarium/4.Sequencing/4.PartialLane/fastp
-
+### Extract some stats from bams
 
 ```
-tool : DeDup
-use: deduplication
-command line: 
-
-tool : MapDamage https://ginolhac.github.io/mapDamage/
-use: quantify damage patterns (C to T substitutions because of C deamination) --> use to rescale per base quality score
-command line: 
-(check relationship with sample age)
-
-tool : FreeBayes (maybe GTAK for 600+ samples?)
-use: deduplication
-command line: 
---use-best-n-alleles 4, --report-monomorphic in 100kb regions
+threads=2
+for file in *.bam; do
+  name=$(basename "$file")
+  total=$(samtools view -@ $threads -c $file)
+  echo -e "TotalReads\n$total" >> $file.log
+done
+```
+sambamba sort -m 15GB --tmpdir $path/bams/tmp -t $threads -o /ohta2/julia.kreiner/waterhemp/herbarium/femaleref/$prefx.sorted.scaled.bam /ohta2/julia.kreiner/waterhemp/herbarium/femaleref/${prefx}.scaled.bam
+samtools merge ${prefx}.final.sorted.bam ${prefx}.unmerg.sorted.bam ${prefx}.merged.sorted.bam
+rm ${prefx}.uns.bam
+mapped=$(samtools view -@ $threads -c $prefx.bam)
+echo -e "MappedReads\n$mapped" >> ${prefx}.log
+echo "EndogenousDNA" >> ${prefx}.log
+python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 
 
 
