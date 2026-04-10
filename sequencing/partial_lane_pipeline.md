@@ -238,7 +238,9 @@ python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=10GB
 
-module load samtools
+#load correct R package
+module load R/3.6.3
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
 
 output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
 
@@ -253,3 +255,7 @@ done
 ```
 
 
+Missing the following R libraries 'inline', 'ggplot2', 'gam', 'Rcpp' and 'RcppGSL'
+Need GSL tp be able to install RccpGSL
+
+I am having dependencies issues with packages and R versions. 
