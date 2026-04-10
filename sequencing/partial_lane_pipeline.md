@@ -113,6 +113,8 @@ module load python/anaconda-2022.05
 source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
 conda activate /project/kreiner
 
+module load samtools
+
 ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
 cd /scratch/midway3/rozennpineau/herbarium_partial_lane/raw
 
@@ -122,7 +124,7 @@ for dir in ./* ; do
     for r1 in *_1.unmerged.fq.gz; do
         prefx=${r1%_1.unmerged.fq.gz}
         # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
-        bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
+        bwa mem -t 6 -R "@RG\tID:$NA\tSM:$NA\tPL:ILLUMINA\tLB:$NA" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
 
     done
 
@@ -136,21 +138,19 @@ done
 #pipe: converts sam to bams with samtool view @ #threads -Sbh sam file input, convert to bam, with header 
 
 ```
+Troubleshooting code:
 
+```
+for r1 in *_L1.short.unmerged.fq.gz ; do
+        prefx=${r1%_L1.short.unmerged.fq.gz}
+        # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
+        bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx\tPL:ILLUMINA\tLB:$prefx" $ref ${prefx}_L1.short.unmerged.fq.gz ${prefx}_L2.short.unmerged.fq.gz | samtools view -@ 6 -Sbh - > ${prefx}.unmerged.uns.bam
 
+done
+```
 The fastq header corresponds to : @Instrument:RunID:FlowcellID:Lane:Tile:X:Y Read:Filter:Control:Index
 
-Custom scripts for the two remaining files that did ot make it within the 10 hours alloted for the job:
 
-```
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
-cd /scratch/midway2/rozennpineau/herbarium_partial_lane/raw
-
-bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx" $ref herb5_CKDL260004894-1A_23F5GKLT4_L1_1.unmerged.fq.gz herb5_CKDL260004894-1A_23F5GKLT4_L1_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway2/rozennpineau/herbarium_partial_lane/bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.unmerged.uns.bam
-
-bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx" $ref herb449_CKDL260004902-1A_23FFGFLT4_L6_1.unmerged.fq.gz herb449_CKDL260004902-1A_23FFGFLT4_L6_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway2/rozennpineau/herbarium_partial_lane/bams/herb449_CKDL260004902-1A_23FFGFLT4_L6_1.unmerged.uns.bam
-
-```
 
 ### Extract results from fastp files
 
