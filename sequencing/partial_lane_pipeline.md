@@ -145,7 +145,6 @@ Command line for herb5 which did not finish:
 bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref herb5_CKDL260004894-1A_23F5GKLT4_L1.collapsed.gz | samtools view -@ 6 -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
 ```
 
-```
 ### Extract number of mapped reads from bams
 
 ```
@@ -158,9 +157,8 @@ done
 ```
 
 ### Sort bams
-Sambamba is a high-performance, parallelized software tool written in the D programming language for fast processing of NGS SAM/BAM/CRAM alignment files.
+[Sambamba](https://lomereiter.github.io/sambamba/) is a high-performance, parallelized software tool written in the D programming language for fast processing of NGS SAM/BAM/CRAM alignment files.
 ```
-
 #!/bin/bash
 #SBATCH --job-name=sortbams
 #SBATCH --output=sortbams.out
