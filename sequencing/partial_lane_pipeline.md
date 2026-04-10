@@ -15,6 +15,7 @@ Compare mean fragment size between between sets of herbarium sequence data AND b
 ```
 #fastp version 0.23.4
 #bwamem2-2.2.1
+#sambamba 1.0.1
 ```
 
 ### Check that all files were downloaded correctly from Novogene
@@ -113,9 +114,8 @@ module load python/anaconda-2022.05
 source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
 conda activate /project/kreiner
 
-module load samtools
-
 ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+threads=6
 cd /scratch/midway3/rozennpineau/herbarium_partial_lane/raw
 
 for dir in ./* ; do
@@ -123,8 +123,8 @@ for dir in ./* ; do
 
     for r1 in *_1.unmerged.fq.gz; do
         prefx=${r1%_1.unmerged.fq.gz}
-        # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
-        bwa mem -t 6 -R "@RG\tID:$NA\tSM:$NA\tPL:ILLUMINA\tLB:$NA" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
+        # 2. Map unmerged reads to Reference Genome, turn SAM to BAM 
+        bwa mem -t $threads -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}_1.unmerged.fq.gz ${prefx}_2.unmerged.fq.gz | samtools view -@ $threads -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/bams/${prefx}.unmerged.uns.bam
 
     done
 
@@ -133,71 +133,20 @@ for dir in ./* ; do
 done
 
 
-
 #explanation: align (produces sam files) bwa mem -t (number of threads) -R (read group header line) $reference_genome reads_lane1 reads_lane2
 #pipe: converts sam to bams with samtool view @ #threads -Sbh sam file input, convert to bam, with header 
 
 ```
-Troubleshooting code:
 
-```
-for r1 in *_L1.short.unmerged.fq.gz ; do
-        prefx=${r1%_L1.short.unmerged.fq.gz}
-        # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
-        bwa mem -t 6 -R "@RG\tID:$prefx\tSM:$prefx\tPL:ILLUMINA\tLB:$prefx" $ref ${prefx}_L1.short.unmerged.fq.gz ${prefx}_L2.short.unmerged.fq.gz | samtools view -@ 6 -Sbh - > ${prefx}.unmerged.uns.bam
-
-done
-```
 The fastq header corresponds to : @Instrument:RunID:FlowcellID:Lane:Tile:X:Y Read:Filter:Control:Index
 
-
-
-### Extract results from fastp files
-
-Using the *json* block file to extract the information for each fastp report:
-
+Command line for herb5 which did not finish:
+```
+bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref herb5_CKDL260004894-1A_23F5GKLT4_L1.collapsed.gz | samtools view -@ 6 -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
 ```
 
-#!/bin/bash
-
-# Output file
-outfile="fastp_summary.txt"
-
-# Header
-echo -e "sample\tmean_len_before\tmean_len_after\tdup_rate\tinsert_peak\tinsert_min\tinsert_max\tq30_bases\tq30_percent\tgc_content\ttotal_reads" > $outfile
-
-# Loop through directories
-for dir in */; do
-    sample=$(basename "$dir")
-    html="${dir}/fastp.html"
-
-    # Skip if no html file
-    [ -f "$html" ] || continue
-
-    # Extract JSON block from HTML
-    json=$(sed -n '/<script id="json" type="application\/json">/,/<\/script>/p' "$html" | sed '1d;$d')
-
-    # Parse values using jq
-    echo "$json" | jq -r --arg sample "$sample" '
-        [
-            $sample,
-            .summary.before_filtering.read1_mean_length,
-            .summary.after_filtering.read1_mean_length,
-            .duplication.rate,
-            .insert_size.peak,
-            .insert_size.min,
-            .insert_size.max,
-            .summary.after_filtering.q30_bases,
-            .summary.after_filtering.q30_rate,
-            .summary.after_filtering.gc_content,
-            .summary.after_filtering.total_reads
-        ] | @tsv
-    ' >> $outfile
-
-done
-
 ```
-### Extract some stats from bams
+### Extract number of mapped reads from bams
 
 ```
 threads=2
@@ -207,13 +156,102 @@ for file in *.bam; do
   echo -e "TotalReads\n$total" >> $file.log
 done
 ```
-sambamba sort -m 15GB --tmpdir $path/bams/tmp -t $threads -o /ohta2/julia.kreiner/waterhemp/herbarium/femaleref/$prefx.sorted.scaled.bam /ohta2/julia.kreiner/waterhemp/herbarium/femaleref/${prefx}.scaled.bam
-samtools merge ${prefx}.final.sorted.bam ${prefx}.unmerg.sorted.bam ${prefx}.merged.sorted.bam
-rm ${prefx}.uns.bam
-mapped=$(samtools view -@ $threads -c $prefx.bam)
-echo -e "MappedReads\n$mapped" >> ${prefx}.log
+
+### Sort bams
+Sambamba is a high-performance, parallelized software tool written in the D programming language for fast processing of NGS SAM/BAM/CRAM alignment files.
+```
+
+#!/bin/bash
+#SBATCH --job-name=sortbams
+#SBATCH --output=sortbams.out
+#SBATCH --error=sortbams.err
+#SBATCH --time=18:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=3
+#SBATCH --mem-per-cpu=10GB
+
+
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner
+
+threads=6
+path_to_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+cd $path_to_bams
+
+for r1 in *.unmerged.uns.bam; do
+        prefx=${r1%.unmerged.uns.bam}
+        sambamba sort -m 15GB --tmpdir $path_to_bams/tmp -t $threads -o $path_to_bams/${prefx}.unmerged.sorted.bam $path_to_bams/${prefx}.unmerged.uns.bam
+done
+
+```
+
+### Merge unmerged and collapsed bams
+
+```
+#!/bin/bash
+#SBATCH --job-name=mergebams
+#SBATCH --output=mergebams.out
+#SBATCH --error=mergebams.err
+#SBATCH --time=10:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=10GB
+
+module load samtools
+unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams
+
+cd $unmerged_bams
+for r1 in *.unmerged.sorted.bam; do
+
+        prefx=${r1%.unmerged.sorted.bam}
+        samtools merge $output_folder/${prefx}.final.sorted.bam $unmerged_bams/${prefx}.unmerged.sorted.bam $collapsed_bams/${prefx}.sorted.bam
+
+done
+
+```
+
+### Calculate mapped reads after merging for comparison
+Using samtools_num_reads.sh script.
+
+### Calculate endogenous DNA
 echo "EndogenousDNA" >> ${prefx}.log
 python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 
+### Map Damage
+[MapDamage](https://ginolhac.github.io/mapDamage/): calculate deamination levels per sample, across the reads, and rescale per-base quality.
+
+```
+#!/bin/bash
+#SBATCH --job-name=mergebams
+#SBATCH --output=mergebams.out
+#SBATCH --error=mergebams.err
+#SBATCH --time=10:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=10GB
+
+module load samtools
+
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
+
+for r1 in *.final.sorted.bam; do
+
+        prefx=${r1%.final.sorted.bam}
+        mapDamage -i ${prefx}.final.sorted.bam -r $ref --rescale
+
+done
+
+#The --rescale parameter can be optionally used to rescale quality scores of likely damaged positions in the reads. A new BAM file is constructed by downscaling quality values for misincorporations likely due to ancient DNA damage according to their initial qualities, position in reads and damage patterns.
+```
 
 
