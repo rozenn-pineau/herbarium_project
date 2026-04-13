@@ -148,12 +148,18 @@ bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref h
 ### Extract number of mapped reads from bams
 
 ```
+outfile="number_mapped_reads_merged.txt"
+
+echo -e  "sample\ttotal" > $outfile
+
 threads=2
 for file in *.bam; do
   name=$(basename "$file")
+  echo "Counting mapped reads in $name"
   total=$(samtools view -@ $threads -c $file)
-  echo -e "TotalReads\n$total" >> $file.log
+  echo -e "$name\t$total" >> $outfile
 done
+
 ```
 
 ### Sort bams
@@ -187,6 +193,11 @@ done
 
 ```
 
+For herb5 alone (did not finish running): 
+```
+sambamba sort -m 15GB --tmpdir tmp -t 2 -o herb5_CKDL260004894-1A_23F5GKLT4_L1.sorted.bam herb5_CKDL260004894-1A_23F5GKLT4_L1.uns.bam
+```
+
 ### Merge unmerged and collapsed bams
 
 ```
@@ -216,37 +227,20 @@ done
 
 ```
 
-Command lines for the files that did not work in the loop (herb5 and herb10). 
+Command lines for the files that did not work in the loop (herb5). 
 
 ```
-module load samtools
-
-#map merged reads to reference
-cd /scratch/midway2/rozennpineau/herbarium_partial_lane/raw/herb5
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
-
-for r1 in *.collapsed.gz; do
-
-prefx=${r1%.collapsed.gz}
-bwa mem -t 2 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}.collapsed.gz | samtools view -@ 2 -Sbh - > /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/${prefx}.uns.bam
-
-done
-
-#sort herb5 collapsed again
-cd /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
-sambamba sort -m 10GB --tmpdir tmp -t 2 -o herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
 
 #check the header
 samtools view herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam | head
 
 #merge
-
 unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
 collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
-output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
 
 cd $unmerged_bams
-samtools merge -f $output_folder/herb5_CKDL260004894-1A_23F5GKLT4_L1.final.sorted.bam $unmerged_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1.unmerged.sorted.bam $collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam
+samtools merge -f $output_folder/herb5_CKDL260004894-1A_23F5GKLT4_L1.final.sorted.bam $unmerged_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1.unmerged.sorted.bam $collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1.sorted.bam
 
 
 ````
@@ -267,18 +261,16 @@ python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 #SBATCH --job-name=mapdamage
 #SBATCH --output=mmapdamage.out
 #SBATCH --error=mapdamage.err
-#SBATCH --time=18:00:00
+#SBATCH --time=36:00:00
 #SBATCH --partition=caslake
 #SBATCH --account=pi-kreiner
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=20GB
 
-#load correct R package
-module load R/4.5.3
 ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
 
-output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
 
 for r1 in *.final.sorted.bam; do
 
@@ -303,3 +295,9 @@ Missing the following R libraries 'inline', 'ggplot2', 'gam', 'Rcpp' and 'RcppGS
 Need GSL tp be able to install RccpGSL
 
 I am having dependencies issues with packages and R versions. 
+
+#On midway2
+
+
+module load python/anaconda-2022.05
+#/home/rozennpineau/.conda/envs/mapdam2
