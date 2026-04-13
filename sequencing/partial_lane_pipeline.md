@@ -216,6 +216,31 @@ done
 
 ```
 
+Command lines for the files that did not work in the loop (herb5 and herb10). 
+
+```
+module load samtools
+
+#sort herb5 collapsed again
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
+sambamba sort -m 10GB --tmpdir tmp -t 2 -o herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
+
+#check the header
+samtools view herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam | head
+
+#merge
+
+unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams
+
+cd $unmerged_bams
+samtools merge -f $output_folder/herb5_CKDL260004894-1A_23F5GKLT4_L1.final.sorted.bam $unmerged_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1.unmerged.sorted.bam $collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam
+
+
+````
+
+
 ### Calculate mapped reads after merging for comparison
 Using samtools_num_reads.sh script.
 
