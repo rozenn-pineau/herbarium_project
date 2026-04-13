@@ -221,6 +221,17 @@ Command lines for the files that did not work in the loop (herb5 and herb10).
 ```
 module load samtools
 
+#map merged reads to reference
+cd /scratch/midway2/rozennpineau/herbarium_partial_lane/raw/herb5
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+
+for r1 in *.collapsed.gz; do
+
+prefx=${r1%.collapsed.gz}
+bwa mem -t 2 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}.collapsed.gz | samtools view -@ 2 -Sbh - > /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/${prefx}.uns.bam
+
+done
+
 #sort herb5 collapsed again
 cd /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
 sambamba sort -m 10GB --tmpdir tmp -t 2 -o herb5_CKDL260004894-1A_23F5GKLT4_L1_1.sorted.bam herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
@@ -253,18 +264,18 @@ python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 
 ```
 #!/bin/bash
-#SBATCH --job-name=mergebams
-#SBATCH --output=mergebams.out
-#SBATCH --error=mergebams.err
-#SBATCH --time=10:00:00
+#SBATCH --job-name=mapdamage
+#SBATCH --output=mmapdamage.out
+#SBATCH --error=mapdamage.err
+#SBATCH --time=18:00:00
 #SBATCH --partition=caslake
 #SBATCH --account=pi-kreiner
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=10GB
+#SBATCH --mem-per-cpu=20GB
 
 #load correct R package
-module load R/3.6.3
+module load R/4.5.3
 ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
 
 output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
@@ -278,7 +289,15 @@ done
 
 #The --rescale parameter can be optionally used to rescale quality scores of likely damaged positions in the reads. A new BAM file is constructed by downscaling quality values for misincorporations likely due to ancient DNA damage according to their initial qualities, position in reads and damage patterns.
 ```
+### Troubleshooting mapDamage
+R version 4.3.3
 
+#loading a newer version of R
+module load R/4.5.3
+install.packages(c("inline", "ggplot2", "gam", "Rcpp", "RcppGSL"))
+
+#error: says it does not see the package RccpGSL that I know has succesfully bee installed herre
+home/rozennpineau/R/x86_64-pc-linux-gnu-library/4.5/00LOCK-RcppGSL/00new/RcppGSL/libs
 
 Missing the following R libraries 'inline', 'ggplot2', 'gam', 'Rcpp' and 'RcppGSL'
 Need GSL tp be able to install RccpGSL
