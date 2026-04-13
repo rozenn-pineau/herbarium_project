@@ -162,6 +162,24 @@ done
 
 ```
 
+### Extract number of *un*mapped reads from bams
+
+```
+outfile="number_unmapped_reads.txt"
+
+echo -e  "sample\ttotal" > $outfile
+
+threads=2
+for file in *.bam; do
+  name=$(basename "$file")
+  echo "Counting unmapped reads in $name"
+  total=$(samtools view -@ $threads -c -f 4 $file)
+  echo -e "$name\t$total" >> $outfile
+done
+
+```
+
+
 ### Sort bams
 [Sambamba](https://lomereiter.github.io/sambamba/) is a high-performance, parallelized software tool written in the D programming language for fast processing of NGS SAM/BAM/CRAM alignment files.
 ```
@@ -227,6 +245,15 @@ done
 
 ```
 
+Sample herb189 was run on two different lanes, merge the bams now:
+
+```
+#merge
+
+samtools merge -f herb189.final.sorted.bam herb189_CKDL260004898-1A_23FFGFLT4_L2.final.sorted.bam herb189_CKDL260004898-1A_23F5GKLT4_L1.final.sorted.bam
+
+````
+
 Command lines for the files that did not work in the loop (herb5). 
 
 ```
@@ -256,6 +283,7 @@ python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 ### Map Damage
 [MapDamage](https://ginolhac.github.io/mapDamage/): calculate deamination levels per sample, across the reads, and rescale per-base quality.
 
+I had some problems with dependencies when using my normal conda environment, so I created another one, called "mapdam".
 ```
 #!/bin/bash
 #SBATCH --job-name=mapdamage
@@ -268,8 +296,12 @@ python -c "print(float($mapped)/ $total)" >> ${prefx}.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=20GB
 
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate mapdam
 
+
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
 cd /scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
 
 for r1 in *.final.sorted.bam; do
@@ -281,23 +313,4 @@ done
 
 #The --rescale parameter can be optionally used to rescale quality scores of likely damaged positions in the reads. A new BAM file is constructed by downscaling quality values for misincorporations likely due to ancient DNA damage according to their initial qualities, position in reads and damage patterns.
 ```
-### Troubleshooting mapDamage
-R version 4.3.3
 
-#loading a newer version of R
-module load R/4.5.3
-install.packages(c("inline", "ggplot2", "gam", "Rcpp", "RcppGSL"))
-
-#error: says it does not see the package RccpGSL that I know has succesfully bee installed herre
-home/rozennpineau/R/x86_64-pc-linux-gnu-library/4.5/00LOCK-RcppGSL/00new/RcppGSL/libs
-
-Missing the following R libraries 'inline', 'ggplot2', 'gam', 'Rcpp' and 'RcppGSL'
-Need GSL tp be able to install RccpGSL
-
-I am having dependencies issues with packages and R versions. 
-
-#On midway2
-
-
-module load python/anaconda-2022.05
-#/home/rozennpineau/.conda/envs/mapdam2
