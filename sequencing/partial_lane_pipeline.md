@@ -16,6 +16,7 @@ Compare mean fragment size between between sets of herbarium sequence data AND b
 #fastp version 0.23.4
 #bwamem2-2.2.1
 #sambamba 1.0.1
+#DeDup v0.12.9
 ```
 
 ### Check that all files were downloaded correctly from Novogene
@@ -313,4 +314,38 @@ done
 
 #The --rescale parameter can be optionally used to rescale quality scores of likely damaged positions in the reads. A new BAM file is constructed by downscaling quality values for misincorporations likely due to ancient DNA damage according to their initial qualities, position in reads and damage patterns.
 ```
+
+### Estimate duplication rates
+[DeDup](https://github.com/apeltzer/DeDup/blob/master/README.md) tool is a PCR duplicate removal tool of paired-end and merged sequenced data designed for ultra-short DNA (e.g. ancient DNA).
+
+```
+#!/bin/bash
+#SBATCH --job-name=dedup
+#SBATCH --output=dedup.out
+#SBATCH --error=dedup.err
+#SBATCH --time=36:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=20GB
+
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/
+
+for folder in result*; do
+  cd $folder
+    for bam in *final.sorted.rescaled.bam; do
+        prefx=${r1%.final.sorted.rescaled.bam}
+        mkdir {}; dedup -i {}.final.sorted.rescaled.bam -m -o {}
+    done
+  cd ..
+done
+
+```
+
+
+
+
 
