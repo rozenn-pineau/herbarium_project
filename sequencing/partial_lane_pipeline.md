@@ -324,15 +324,21 @@ done
 #SBATCH --output=dedup.out
 #SBATCH --error=dedup.err
 #SBATCH --time=36:00:00
-#SBATCH --partition=caslake
+#SBATCH --partition=broadwl
 #SBATCH --account=pi-kreiner
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=20GB
 
-module load python/anaconda-2022.05
-source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
-conda activate /project/kreiner/
+#module load python/anaconda-2022.05
+#source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+#conda activate /project/kreiner/
+
+module load python/python/anaconda-2021.05
+source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
+conda activate mapdam
+
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
 
 for folder in result*; do
   cd $folder
