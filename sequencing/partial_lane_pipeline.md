@@ -316,37 +316,43 @@ done
 ```
 
 ### Estimate duplication rates
+
+Trying with two different tools, DeDup and Picard. 
+
+With DeDup:
+
+
 [DeDup](https://github.com/apeltzer/DeDup/blob/master/README.md) tool is a PCR duplicate removal tool of paired-end and merged sequenced data designed for ultra-short DNA (e.g. ancient DNA).
-
 ```
-#!/bin/bash
-#SBATCH --job-name=dedup
-#SBATCH --output=dedup.out
-#SBATCH --error=dedup.err
-#SBATCH --time=36:00:00
-#SBATCH --partition=broadwl
-#SBATCH --account=pi-kreiner
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=20GB
-
-#module load python/anaconda-2022.05
-#source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
-#conda activate /project/kreiner/
-
 module load python/python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
 conda activate mapdam
 
-cd /scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
+bam_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
+cd $bam_folder
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams/dedup_marked_dups
 
-for folder in result*; do
-  cd $folder
-    for bam in *final.sorted.rescaled.bam; do
-        prefx=${r1%.final.sorted.rescaled.bam}
-        mkdir {}; dedup -i {}.final.sorted.rescaled.bam -m -o {}
-    done
-  cd ..
+for bam in *.renamed.final.sorted.bam; do
+        name=${bam%.renamed.final.sorted.bam}
+        mkdir -p $output_folder/$name
+        dedup -i $bam -o $output_folder/$name
+done
+```
+
+With picard: 
+```
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner
+
+bam_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams
+cd $bam_folder
+output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams/picard_marked_dups
+
+for bam in .renamed.final.sorted.bam; do
+        name=${bam%.renamed.final.sorted.bam}
+        picard MarkDuplicates I=${name}.renamed.final.sorted.bam O=$output_folder/${name}.dup.renamed.final.sorted.bam M=$output_folder/${name}.dup.txt
 done
 
 ```
