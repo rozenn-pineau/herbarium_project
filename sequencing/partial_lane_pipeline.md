@@ -321,8 +321,39 @@ Trying with two different tools, DeDup and Picard.
 
 With DeDup:
 
+I first have to split the bam into chromosomes, as it keeps running out of memory on the full bam file. 
+
+```
+#!/bin/bash
+#SBATCH --job-name=split
+#SBATCH --output=split.out
+#SBATCH --error=split.err
+#SBATCH --time=10:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=20GB
+
+#create a subfolder for each file
+#split bam into chromosomes
+
+bam=herb5_CKDL260004894-1A_23F5GKLT4_L1.renamed.final.sorted.bam
+
+name=${bam%.renamed.final.sorted.bam}
+mkdir $name
+for chr in $(samtools idxstats $bam | cut -f1); do
+    echo "Splitting $chr..."
+    samtools view -b $bam "$chr" > $name/"${chr}.bam" #split into scaffolds
+    samtools index $name/"${chr}.bam" #index
+done
+
+```
 
 [DeDup](https://github.com/apeltzer/DeDup/blob/master/README.md) tool is a PCR duplicate removal tool of paired-end and merged sequenced data designed for ultra-short DNA (e.g. ancient DNA).
+
+DeDup looks for reads with the same start and end coordinates, and whether they have exactly the same sequence. The main difference of DeDup versus e.g. samtools markduplicates is that DeDup considers both ends of a read, not just the start position, so it is more precise in removing actual duplicates without penalising often already low aDNA data. (from: https://nf-co.re/eager/2.4.1/docs/output#dedup)
+
 ```
 module load python/python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
