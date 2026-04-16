@@ -339,6 +339,8 @@ for bam in *.renamed.final.sorted.bam; do
 done
 ```
 
+Initially, the run was not able to write the files to the folder because of a memory error. I increased the memory allocation and started the run again. 
+
 With picard: 
 ```
 #activate conda
