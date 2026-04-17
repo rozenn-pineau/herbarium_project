@@ -390,14 +390,40 @@ done
 
 ```
 
+### Retrieve duplication rate from files after running DeDup
+
+```
+echo -e "sample\tmean duplication rate" > mean_dup_rate.txt
+for sample_dir in herb*/; do
+cd $sample_dir
+  echo -e "scaffold\tduplication rate" > dup_rate_summary.txt
+  for scaffold_dir in [Ss]*/; do
+    scaffold_name=$(basename "$scaffold_dir")
+    
+    dup_rate=$(awk '/Duplication Rate/ {print $3}' "$scaffold_dir/$scaffold_name.log") #Retrieve duplication rate
+
+    echo -e "${scaffold_name}\t${dup_rate}" >> dup_rate_summary.txt
+  done
+  #calculate mean over all scaffolds
+  mean=$(awk 'NR>1 {sum += $2; n++} END {print sum/n}' dup_rate_summary.txt)
+cd ..
+echo -e "$sample_dir\t$mean" >> mean_dup_rate.txt
+done
+```
+
+
+
+
 ### Calculate depth at each step
 With samtools:
 ```
+module load samtools
+
 out="average_bam_depths.txt"
 echo -e "Sample\tAverage_Depth" > $out
 
-for bam in *.unmerged.sorted.bam; do
-    name=${bam%.unmerged.sorted.bam}
+for bam in *.dup.renamed.final.sorted.bam; do
+    name=${bam%.dup.renamed.final.sorted.bam}
     AVG_DEPTH=$(samtools depth "$bam" | awk '{sum+=$3} END {if (NR>0) print sum/NR; else print 0}')
     echo -e "${name}\t${AVG_DEPTH}" >> $out
 done
