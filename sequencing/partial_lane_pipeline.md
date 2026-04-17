@@ -396,8 +396,8 @@ With samtools:
 out="average_bam_depths.txt"
 echo -e "Sample\tAverage_Depth" > $out
 
-for bam in *.renamed.sorted.bam; do
-    name=${bam%.renamed.sorted.bam}
+for bam in *.unmerged.sorted.bam; do
+    name=${bam%.unmerged.sorted.bam}
     AVG_DEPTH=$(samtools depth "$bam" | awk '{sum+=$3} END {if (NR>0) print sum/NR; else print 0}')
     echo -e "${name}\t${AVG_DEPTH}" >> $out
 done
