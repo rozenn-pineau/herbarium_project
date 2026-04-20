@@ -108,7 +108,7 @@ done
 
 
 
-### Map to reference genome with bwamem
+### Map to reference genome with bwamem - unmerged reads
 ```
 #activate conda
 module load python/anaconda-2022.05
@@ -141,9 +141,31 @@ done
 
 The fastq header corresponds to : @Instrument:RunID:FlowcellID:Lane:Tile:X:Y Read:Filter:Control:Index
 
-Command line for herb5 which did not finish:
+### Align collapsed reads
+
 ```
-bwa mem -t 6 -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref herb5_CKDL260004894-1A_23F5GKLT4_L1.collapsed.gz | samtools view -@ 6 -Sbh - >  /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/herb5_CKDL260004894-1A_23F5GKLT4_L1_1.collapsed.uns.bam
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner
+
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+threads=6
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/raw
+
+for dir in ./* ; do
+    cd "$dir" || continue
+
+    for r1 in *.collapsed.gz; do
+        prefx=${r1%.collapsed.gz}
+        # 2. Map merged (collapsed) reads to Reference Genome, turn SAM to BAM 
+        bwa mem -t $threads -R "@RG\tID:${prefx}\tSM:${prefx}\tPL:ILLUMINA\tLB:${prefx}" $ref ${prefx}.collapsed.gz | samtools view -@ $threads -Sbh - > /scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/${prefx}.uns.bam
+
+    done
+
+    cd ..
+
+done
 ```
 
 ### Extract number of mapped reads from bams
@@ -210,11 +232,6 @@ for r1 in *.unmerged.uns.bam; do
         sambamba sort -m 15GB --tmpdir $path_to_bams/tmp -t $threads -o $path_to_bams/${prefx}.unmerged.sorted.bam $path_to_bams/${prefx}.unmerged.uns.bam
 done
 
-```
-
-For herb5 alone (did not finish running): 
-```
-sambamba sort -m 15GB --tmpdir tmp -t 2 -o herb5_CKDL260004894-1A_23F5GKLT4_L1.sorted.bam herb5_CKDL260004894-1A_23F5GKLT4_L1.uns.bam
 ```
 
 ### Merge unmerged and collapsed bams
