@@ -411,7 +411,16 @@ echo -e "$sample_dir\t$mean" >> mean_dup_rate.txt
 done
 ```
 
+Calculate mean duplication rate for Scaffolds 1-16:
+```
+echo -e "Sample\tScaffold1-16_duplication_rate" > scaffold1-16_mean_dup_rate.txt
 
+for dir in ./herb*; do
+  #echo $dir
+  dup_rate=$(cat $dir/dup_rate_summary.txt | grep Scaffold | awk 'NR>1 {sum += $2; n++} END {print sum/n}')
+  echo -e "${dir}\t${dup_rate}" >> scaffold1-16_mean_dup_rate.txt
+done
+```
 
 
 ### Calculate depth at each step
