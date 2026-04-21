@@ -36,8 +36,6 @@ done
 ```
 
 ### Check quality with fastp
-
-
 Remove adapters, poly Q tails, merge reads (important for short frags).
 command line: herbarium_pipeline.sh sample ref_genome 
 #sample is in the first positional argument in the bash script
@@ -71,6 +69,7 @@ for dir in ./* ; do
     cd ..
 done
 ```
+
 ### Analyze fastp results
 Using the *json* block file to extract the information for each fastp report:
 
@@ -106,7 +105,21 @@ done
 
 ```
 
+### Calculate expected maximum coverage based on raw reads
+Calculate the number of base pairs in unmerged and collapsed reads :
+```
+out=number_base_pairs_unmerged.txt
+echo -e "Sample\tnum_base_pairs" > $out
 
+for fq in */*.unmerged.fq.gz; do
+
+  samp=$(basename "$fq")
+  echo $samp
+  num=$(zcat $fq | awk 'NR % 4 == 2 {sum += length($0)} END {print sum}')
+  echo -e "$samp\t$num" >> $out
+
+done
+```
 
 ### Map to reference genome with bwamem - unmerged reads
 ```
@@ -141,7 +154,7 @@ done
 
 The fastq header corresponds to : @Instrument:RunID:FlowcellID:Lane:Tile:X:Y Read:Filter:Control:Index
 
-### Align collapsed reads
+### Map to reference genome with bwamem - collapsed reads
 
 ```
 #activate conda
@@ -206,17 +219,6 @@ done
 ### Sort bams
 [Sambamba](https://lomereiter.github.io/sambamba/) is a high-performance, parallelized software tool written in the D programming language for fast processing of NGS SAM/BAM/CRAM alignment files.
 ```
-#!/bin/bash
-#SBATCH --job-name=sortbams
-#SBATCH --output=sortbams.out
-#SBATCH --error=sortbams.err
-#SBATCH --time=18:00:00
-#SBATCH --partition=caslake
-#SBATCH --account=pi-kreiner
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=3
-#SBATCH --mem-per-cpu=10GB
-
 
 #activate conda
 module load python/anaconda-2022.05
@@ -237,17 +239,6 @@ done
 ### Merge unmerged and collapsed bams
 
 ```
-#!/bin/bash
-#SBATCH --job-name=mergebams
-#SBATCH --output=mergebams.out
-#SBATCH --error=mergebams.err
-#SBATCH --time=10:00:00
-#SBATCH --partition=caslake
-#SBATCH --account=pi-kreiner
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=10GB
-
 module load samtools
 unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
 collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
