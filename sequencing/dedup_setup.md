@@ -36,7 +36,28 @@ for bam in *.sorted.bam; do
 done
 ```
 
-
+### Splitting Forward and Reverse reads
 For Forward and Reverse: (1) split between forward and reverse, then (2) add the prefix to the header. 
 
 
+For Forward reads:
+```
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+# split
+samtools view -F 0x10 -h herb10_CKDL260004895-1A_23FFGFLT4_L6.unmerged.sorted.bam | samtools view -bS - > forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.F.unmerged.sorted.bam #exclude reverse read
+# rename
+samtools view -h forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.F.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/F_/' | samtools view -bS - > forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.F.prefixed.unmerged.bam
+#sort and index
+sambamba sort -m 15GB --tmpdir tmp -t $threads -o forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.F.prefixed.unmerged.sorted.bam forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.F.prefixed.unmerged.bam   
+```
+
+For Reverse reads:
+```
+cd /scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+# split
+samtools view -f 0x10 -h herb10_CKDL260004895-1A_23FFGFLT4_L6.unmerged.sorted.bam | samtools view -bS - > reverse/herb10_CKDL260004895-1A_23FFGFLT4_L6.R.unmerged.sorted.bam #include reverse reads only
+# rename
+samtools view -h reverse/herb10_CKDL260004895-1A_23FFGFLT4_L6.R.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/R_/' | samtools view -bS - > reverse/herb10_CKDL260004895-1A_23FFGFLT4_L6.R.prefixed.unmerged.bam
+#sort and index
+sambamba sort -m 15GB --tmpdir tmp -t $threads -o forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.R.prefixed.unmerged.sorted.bam forward/herb10_CKDL260004895-1A_23FFGFLT4_L6.R.prefixed.unmerged.bam   
+```
