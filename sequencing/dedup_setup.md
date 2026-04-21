@@ -11,3 +11,32 @@ To each of the merged bam read, I need to add M_
 
 To each of the non-merged bam reads, I need to add R_ to reverse and F_ to forward strands. 
 
+### Adding M_ to collapsed reads
+```
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner
+
+module load samtools
+collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
+out=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/renamed_bams
+threads=2
+
+cd $collapsed_bams
+for bam in *.sorted.bam; do
+
+        #prefix header with M_
+        name=${bam%.sorted.bam}
+        samtools view -h ${name}.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/M_/' | samtools view -bS - > $out/${name}.prefixed.bam
+
+        #sort and index
+        sambamba sort -m 15GB --tmpdir tmp -t $threads -o $out/${name}.prefixed.sorted.bam $out/${name}.prefixed.bam                         
+
+done
+```
+
+
+For Forward and Reverse: (1) split between forward and reverse, then (2) add the prefix to the header. 
+
+
