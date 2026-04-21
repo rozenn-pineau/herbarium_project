@@ -181,6 +181,28 @@ for dir in ./* ; do
 done
 ```
 
+### Count the number of base pairs in bams
+Calculate the numebr of base pairs that were effectively mapped in both unmerged and collapased reads.
+
+```
+module load samtools
+path=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/renamed_bams
+cd $path
+out=number_base_pairs_collapsed_bams.txt
+echo -e "sample\tnum_base_pairs" > $out
+
+for bam in *.prefixed.sorted.bam; do
+
+  name=${bam%.prefixed.sorted.bam}
+  echo "Calculating base pairs mapped in $name..."
+  num=$(samtools stats $bam | grep "bases mapped (cigar):" | cut -f 3)
+  echo -e "$name\t$num" >> $out
+
+done
+
+
+```
+
 ### Extract number of mapped reads from bams
 
 ```
@@ -236,11 +258,13 @@ done
 
 ```
 
+
+
 ### Merge unmerged and collapsed bams
 
 ```
 module load samtools
-unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams
+unmerged_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/bams/renamed/
 collapsed_bams=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams
 output_folder=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams
 
