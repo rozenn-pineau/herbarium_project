@@ -186,14 +186,14 @@ Calculate the numebr of base pairs that were effectively mapped in both unmerged
 
 ```
 module load samtools
-path=/scratch/midway3/rozennpineau/herbarium_partial_lane/collapsed_bams/renamed_bams
+path=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams
 cd $path
-out=number_base_pairs_collapsed_bams.txt
+out=number_base_pairs_merged_bams.txt
 echo -e "sample\tnum_base_pairs" > $out
 
-for bam in *.prefixed.sorted.bam; do
+for bam in *.renamed.final.sorted.bam; do
 
-  name=${bam%.prefixed.sorted.bam}
+  name=${bam%.renamed.final.sorted.bam}
   echo "Calculating base pairs mapped in $name..."
   num=$(samtools stats $bam | grep "bases mapped (cigar):" | cut -f 3)
   echo -e "$name\t$num" >> $out
@@ -356,19 +356,15 @@ With DeDup:
 I first have to split the bam into chromosomes, as it keeps running out of memory on the full bam file. 
 
 ```
-#!/bin/bash
-#SBATCH --job-name=split
-#SBATCH --output=split.out
-#SBATCH --error=split.err
-#SBATCH --time=10:00:00
-#SBATCH --partition=caslake
-#SBATCH --account=pi-kreiner
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=20GB
-
 #create a subfolder for each file
 #split bam into chromosomes
+
+!!! There is a problem with this script in that it looks at more and more bams as it goes, copied the "herb" files into the scaffold folders.
+
+Make sure to test it before running again.
+
+it might be in the chr loop
+
 
 bam=herb5_CKDL260004894-1A_23F5GKLT4_L1.renamed.final.sorted.bam
 
@@ -386,6 +382,8 @@ done
 
 DeDup looks for reads with the same start and end coordinates, and whether they have exactly the same sequence. The main difference of DeDup versus e.g. samtools markduplicates is that DeDup considers both ends of a read, not just the start position, so it is more precise in removing actual duplicates without penalising often already low aDNA data. (from: https://nf-co.re/eager/2.4.1/docs/output#dedup)
 
+
+Run DeDup:
 ```
 module load python/python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
