@@ -477,21 +477,6 @@ done
 ```
 
 
-### Calculate depth at each step
-With samtools:
-```
-module load samtools
-
-out="average_bam_depths.txt"
-echo -e "Sample\tAverage_Depth" > $out
-
-for bam in *.dup.renamed.final.sorted.bam; do
-    name=${bam%.dup.renamed.final.sorted.bam}
-    AVG_DEPTH=$(samtools depth "$bam" | awk '{sum+=$3} END {if (NR>0) print sum/NR; else print 0}')
-    echo -e "${name}\t${AVG_DEPTH}" >> $out
-done
-```
-
 
 
 
