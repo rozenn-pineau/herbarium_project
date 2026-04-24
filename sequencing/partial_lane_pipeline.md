@@ -456,9 +456,11 @@ done
 Dedup create a subfolder for each file, and I had to scaffold the samples to run it, so I am left with 1000 + folders for each file. I would like to merge the deduped bams to calculate samtools depth. 
 
 ```
+start_dir=/scratch/midway3/rozennpineau/herbarium_partial_lane/merged_bams/scaffolds
+
 #activate conda
-module load python/anaconda-2021.05
-source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
 conda activate /project/kreiner/rpineau/bamtools
 
 ulimit -n 4096 # increase upper limit of number of files that can be opened at once
