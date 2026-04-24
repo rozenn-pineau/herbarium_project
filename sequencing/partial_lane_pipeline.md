@@ -385,7 +385,7 @@ DeDup looks for reads with the same start and end coordinates, and whether they 
 
 Run DeDup:
 ```
-module load python/python/anaconda-2021.05
+module load python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
 conda activate mapdam
 
@@ -455,21 +455,20 @@ done
 ### Merge files after running DeDup
 Dedup create a subfolder for each file, and I had to scaffold the samples to run it, so I am left with 1000 + folders for each file. I would like to merge the deduped bams to calculate samtools depth. 
 
-I keep getting an error for the merging, so let's focus on the Scaffolds 1 to 10 to start.
 ```
-start_dir=/scratch/midway3/rozennpineau/herbarium_partial_lane/final_bams/renamed_bams_dedup/scaffolded_bams/bams_done
-
 #activate conda
-module load python/python/anaconda-2021.05
+module load python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
-conda activate mapdam
+conda activate /project/kreiner/rpineau/bamtools
+
+ulimit -n 4096 # increase upper limit of number of files that can be opened at once
 
 cd $start_dir
 for dir in ./*; do
     cd $dir
-    echo "Working on $dir..."
-    realpath */[S]*rmdup.bam > bams_to_merge.list
-    bamtools merge -list bams_to_merge.list -out $dir.Scaffolds1-16.dedup.bam
+
+    realpath */[s]*rmdup.bam > bams_to_merge.list
+    bamtools merge -list bams_to_merge.list -out $dir.scaffolds.dedup.bam
 
     cd ..
 done
