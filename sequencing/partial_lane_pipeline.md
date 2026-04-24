@@ -469,7 +469,8 @@ cd $start_dir
 for dir in ./*; do
     cd $dir
 
-    realpath */[s]*rmdup.bam > bams_to_merge.list
+    realpath */[Ss]*rmdup.bam > bams_to_merge.list
+    echo "merging $dir..."
     bamtools merge -list bams_to_merge.list -out $dir.scaffolds.dedup.bam
 
     cd ..
