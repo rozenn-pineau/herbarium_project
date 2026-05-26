@@ -1,3 +1,16 @@
+### County-level herbicide data use, 1992 - 2019
+
+Dowloading the herbicide use information from 1992 to 2019 from the [Pesticide National Synthesis Project](https://water.usgs.gov/nawqa/pnsp/usage/maps/show_map.php?year=1992&map=GLYPHOSATE&hilo=L).
+
+```
+for year in {1992..2019}
+do
+    wget "https://water.usgs.gov/nawqa/pnsp/usage/maps/county-level/PesticideUseEstimates/EPest.county.estimates.${year}.txt"
+done
+```
+
+
+
 ### State-level herbicide use data 1992-2017
 
 From : https://www.sciencebase.gov/catalog/item/5e95c13a82ce172707f25252 
