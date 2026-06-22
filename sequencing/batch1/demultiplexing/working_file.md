@@ -127,6 +127,11 @@ I got demuxbyname to work when using the *reverse-complement* of the i5 sequence
 
 
 
+Observations:
+
+- I sequenced 126 samples but when i assigned barcodes, I used all the samples I had library prepped in the barcode file and I ended up finding a correspondance for all of those samples! Could they be contamination? The files are a few read (2-4) per sample. 
+
+
 
 
 
