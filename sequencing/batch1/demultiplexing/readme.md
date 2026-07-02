@@ -1,4 +1,4 @@
-This readme describes the steps from downloading the data from Novogene, demultiplexing and initial filtering steps/
+This readme describes the steps from downloading the data from Novogene, demultiplexing and initial filtering steps.
 
 ## Retrieving the data from Novogene
 ### Downloading the data from Novogene using lftp
@@ -26,7 +26,7 @@ demuxbyname from BBmap tools:
 Using demuxbyname_batch1_barcodes.txt having i7 sequence then i5 sequence *reverse complemented* in the following format: NNNNNNNN+NNNNNNNN, Hamming distance of 1:
 
 
-(This script took !3h with 367 Gbytes of data).
+(This script took 3h with 367 Gbytes of data).
 
 ```
 #activate conda
@@ -146,6 +146,83 @@ mv sample_*.fastq.gz not_sequenced/ 2>/dev/null
 25 GBytes of samples that were not supposed to be sequenced...
 
 304 GBytes of samples that were supposed to be sequenced.
+
+
+### Analyze fastp results
+Using the json block file to extract the information for each fastp report:
+
+```
+#!/bin/bash
+
+outfile="fastp_summary.txt"
+
+# Updated header (removed min/max)
+echo -e "sample\tmean_len_before\tmean_len_after\tdup_rate\tinsert_peak\tq30_bases\tq30_percent\tgc_content\ttotal_reads" > "$outfile"
+
+for json_file in *jason; do
+
+    sample=${json_file%.jason}
+    [ -f "$json_file" ] || continue
+
+    jq -r --arg sample "$sample" '
+        [
+            $sample,
+            .summary.before_filtering.read1_mean_length,
+            .summary.after_filtering.read1_mean_length,
+            .duplication.rate,
+            (.insert_size.peak // "NA"),
+            .summary.after_filtering.q30_bases,
+            .summary.after_filtering.q30_rate,
+            .summary.after_filtering.gc_content,
+            .summary.after_filtering.total_reads
+        ] | @tsv
+    ' "$json_file" >> "$outfile"
+
+done
+```
+
+### Calculate max. expected coverage based on raw reads
+
+```
+out=number_base_pairs_raw.txt
+
+# Create the output file only if it doesn't already exist
+if [ ! -f "$out" ]; then
+    echo -e "Sample\tnum_base_pairs" > "$out"
+fi
+
+for fq in *.fastq.gz; do
+
+    samp=$(basename "$fq")
+
+    # Skip if this sample has already been processed
+    if grep -q "^${samp}" "$out"; then
+        echo "Skipping $samp (already processed)"
+        continue
+    fi
+
+    echo "Processing $samp"
+
+    num=$(zcat "$fq" | awk 'NR % 4 == 2 {sum += length($0)} END {print sum}')
+
+    echo -e "$samp\t$num" >> "$out"
+
+done
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
