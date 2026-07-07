@@ -210,6 +210,35 @@ for fq in *.fastq.gz; do
 done
 ```
 
+## Calculate max. expected coverage based on fastp filtered reads
+
+```
+out=number_base_pairs_fastp.txt
+
+# Create the output file only if it doesn't already exist
+if [ ! -f "$out" ]; then
+    echo -e "Sample\tnum_base_pairs" > "$out"
+fi
+
+for fq in *.fq.gz; do
+
+    samp=$(basename "$fq")
+
+    # Skip if this sample has already been processed
+    if grep -q "^${samp}" "$out"; then
+        echo "Skipping $samp (already processed)"
+        continue
+    fi
+
+    echo "Processing $samp"
+
+    num=$(zcat "$fq" | awk 'NR % 4 == 2 {sum += length($0)} END {print sum}')
+
+    echo -e "$samp\t$num" >> "$out"
+
+done
+
+```
 
 
 
