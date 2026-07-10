@@ -28,52 +28,110 @@ for bam in *.sorted.bam; do
 
         #prefix header with M_
         name=${bam%.sorted.bam}
+        output=$out/${name}.prefixed.bam
+
+        #check if file is present
+        if [ -s "$output" ]; then
+                echo "$output already exists and is not empty, skipping."
+        else
         samtools view -h ${name}.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/M_/' | samtools view -bS - > $out/${name}.prefixed.bam
+        fi
 
-        #sort and index
-        sambamba sort -m 15GB --tmpdir tmp -t $threads -o $out/${name}.prefixed.sorted.bam $out/${name}.prefixed.bam                         
-
+        #sort prefixed bam
+        sorted_output=$out/${name}.prefixed.sorted.bam
+        if [ -s "$sorted_output" ] ; then
+                echo "$sorted_output already exists and is not empty, skipping."
+        else
+                #sort and index
+                sambamba sort -m 15GB --tmpdir tmp -t $threads -o $sorted_output/${name} $output
+        fi
 done
 
+#checking for the presence of the file (as compared to the completion) works in this scenario because samtools outputs only when it is done, not as it goes
+```
+### Adding F_ and R_ to forward and reverse reads
 
+```
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/rpineau/sambamba
+module load samtools
 
 ### Adding F_ to forward reads
+
 cd /scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/sorted/unmerged
-mkdir forward
+mkdir -p forward #creates the folder if it is missing, ignores it safely if it exists
+threads=6
 
 for bam in *.unmerged.sorted.bam; do
-	name=${bam%.unmerged.sorted.bam}
-	# split
-	samtools view -F 0x10 -h ${name}.unmerged.sorted.bam | samtools view -bS - > forward/${name}.F.unmerged.sorted.bam #exclude reverse read
-	# rename
-	samtools view -h forward/${name}.F.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/F_/' | samtools view -bS - > forward/${name}.F.prefixed.unmerged.bam
-	#sort and index
-	sambamba sort -m 15GB --tmpdir tmp -t $threads -o forward/${name}.F.prefixed.unmerged.sorted.bam forward/${name}.F.prefixed.unmerged.bam   
+
+        name=${bam%.unmerged.sorted.bam}
+
+        if [ -s "forward/${name}.F.prefixed.unmerged.bam" ] ; then
+                echo "File forward/${name}.F.prefixed.unmerged.bam exists, skipping."
+        else
+                # split
+                samtools view -F 0x10 -h ${name}.unmerged.sorted.bam | samtools view -bS - > forward/${name}.F.unmerged.sorted.bam #exclude reverse read
+                # rename
+                samtools view -h forward/${name}.F.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/F_/' | samtools view -bS - > forward/${name}.F.prefixed.unmerged.bam
+        fi
+
+        #sort and index
+        echo "Sorting forward/${name}.F.prefixed.unmerged.bam."
+        sambamba sort -m 15GB --tmpdir tmp -t $threads -o forward/${name}.F.prefixed.unmerged.sorted.bam forward/${name}.F.prefixed.unmerged.bam
 
 done
 
 
 ### Adding R_ to reverse reads
+
 cd /scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/sorted/unmerged
-mkdir reverse
+mkdir -p reverse
+threads=6
 
 for bam in *.unmerged.sorted.bam; do
+
         name=${bam%.unmerged.sorted.bam}
-        # split
-        samtools view -f 0x10 -h ${name}.unmerged.sorted.bam | samtools view -bS - > reverse/${name}.R.unmerged.sorted.bam #exclude forward read
-        # rename
-        samtools view -h reverse/${name}.R.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/R_/' | samtools view -bS - > reverse/${name}.R.prefixed.unmerged.bam
+
+        if [ -s "reverse/${name}.R.prefixed.unmerged.bam" ]; then
+                echo "File reverse/${name}.R.prefixed.unmerged.bam exists, skipping."
+        else
+                # split
+                samtools view -f 0x10 -h ${name}.unmerged.sorted.bam | samtools view -bS - > reverse/${name}.R.unmerged.sorted.bam #exclude forward read
+                # rename
+                samtools view -h reverse/${name}.R.unmerged.sorted.bam | sed 's/^@/&/;/^[^@]/s/^/R_/' | samtools view -bS - > reverse/${name}.R.prefixed.unmerged.bam
+        fi
+
         #sort and index
-        sambamba sort -m 15GB --tmpdir tmp -t $threads -o reverse/${name}.R.prefixed.unmerged.sorted.bam reverse/${name}.R.prefixed.unmerged.bam                                                          
+        echo "Sorting reverse/${name}.R.prefixed.unmerged.bam."
+        sambamba sort -m 15GB --tmpdir tmp -t $threads -o reverse/${name}.R.prefixed.unmerged.sorted.bam reverse/${name}.R.prefixed.unmerged.bam
 
 done
-
-
 
 ```
 
 
+### Merge prefixed bams
 
+```
+module load samtools
+unmerged_R_bams=/scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/sorted/unmerged/reverse
+unmerged_F_bams=/scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/sorted/unmerged/forward
+collapsed_bams=/scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/sorted/collapsed/renamed
+output_folder=/scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/final
+
+cd $unmerged_R_bams
+
+for r1 in *.R.prefixed.unmerged.sorted.bam; do
+
+        prefx=${r1%.R.prefixed.unmerged.sorted.bam}
+        samtools merge $output_folder/${prefx}.prefixed.bam $unmerged_R_bams/${prefx}.R.prefixed.unmerged.sorted.bam $unmerged_F_bams/${prefx}.F.prefixed.unmerged.sorted.bam $collapsed_bams/${prefx}.prefixed.sorted.bam
+
+done
+
+
+```
 
 
 
