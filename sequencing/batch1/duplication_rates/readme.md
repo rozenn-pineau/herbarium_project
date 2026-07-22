@@ -166,23 +166,29 @@ I first have to split the bam into chromosomes, as it keeps running out of memor
 
 ```
 
-cd /scratch/midway3/rozennpineau/herbarium/01.RawData/P1/bams/final/sorted
+cd /scratch/midway2/rozennpineau/herbarium/bams/final/sorted
 
 module load samtools
 
 for bam in *.prefixed.sorted.bam; do
-
+        
         name=${bam%.prefixed.sorted.bam}
-        mkdir -p split/$name
+       
+        
+        #check if sample has already been split
+        if [ -s "split/$name/scaffold_999.bam.bai" ]; then
+                echo "$name has been split, moving on."
+        else
+                 mkdir -p split/$name
+                #retrieve scaffolds with samtools idxstats, ignore last line of output as it is a wildcard
+                for chr in $(samtools idxstats $bam | cut -f1 | head -n -1); do
 
-        #retrieve scaffolds with samtools idxstats, ignore last line of output as it is a wildcard
-        for chr in $(samtools idxstats $bam | cut -f1 | head -n -1); do
+                        echo "Splitting $chr..."
+                        samtools view -b $bam "$chr" > split/$name/"${chr}.bam" #split into scaffolds
+                        samtools index split/$name/"${chr}.bam" #index
 
-                echo "Splitting $chr..."
-                samtools view -b $bam "$chr" > split/$name/"${chr}.bam" #split into scaffolds
-                samtools index split/$name/"${chr}.bam" #index
-
-        done
+                done
+        fi
 
 done
 
@@ -239,6 +245,9 @@ These all worked, going back to "splitting the bam into scaffolds step".
 
 ### Running Dedup
 
+
+!!! Add a way to follow how many files have been processed because it is hard to read the slurm.err or .out and know the progression of the work !!!
+
 ```
 #!/bin/bash
 #SBATCH --job-name=dedup
@@ -268,5 +277,121 @@ for dir in ./sample_*; do
                 dedup -i $bam -o ${name}
         done
     cd ../
+done
+```
+
+This script was running very slow, so I updated it with some parallelization: 
+
+I also realized I made a mistake and the bams were being overwritten and the log was not properly stored, so I deleted the splitted bams to run that script again. 
+
+```
+#!/bin/bash
+#SBATCH --job-name=dedup
+#SBATCH --output=dedup.out
+#SBATCH --error=dedup.err
+#SBATCH --time=36:00:00
+#SBATCH --partition=broadwl
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=6
+#SBATCH --mem-per-cpu=8GB
+
+
+module load python/anaconda-2021.05
+source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/rpineau/dedup/
+module load samtools
+module load parallel   # load GNU parallel if it's provided as a module on Midway2
+
+working_dir=/scratch/midway2/rozennpineau/herbarium/bams/final/sorted/split/to_do
+cd "$working_dir"
+output_folder=/scratch/midway2/rozennpineau/herbarium/bams/final/sorted/split/dedup
+
+#find: lists all bams in the directories
+find . -mindepth 2 -maxdepth 2 -name "*.bam" | sed 's|^\./||' | \
+#-mindepth 2 = only look at files that are 2 levels deep 
+#-maxdepth 2 = don't go any deeper than that 
+
+#running dedup on each file, in parallel
+# -j N = number of dedup jobs to run at once; match to --cpus-per-task above
+parallel -j 8 --joblog parallel_dedup.log '
+    dir=$(dirname {})
+    fname=$(basename {})
+    name=${fname%.bam}
+    cd "$dir"
+    mkdir -p "$output_folder/$name"
+    dedup -i "$fname" -o "$output_folder/$name"
+'
+```
+
+### Retrieve duplication rate from files after running DeDup
+
+```
+#!/bin/bash
+#SBATCH --job-name=calc_dup_rate
+#SBATCH --output=calc_dup_rate.out
+#SBATCH --error=calc_dup_rate.err
+#SBATCH --time=10:00:00
+#SBATCH --partition=broadwl
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=12GB
+
+cd /scratch/midway2/rozennpineau/herbarium/bams/final/sorted/split/dedup
+
+echo -e "sample\tmean duplication rate" > mean_dup_rate.txt
+for sample_dir in sample*/; do
+cd $sample_dir
+  echo -e "scaffold\tduplication rate" > dup_rate_summary.txt
+  for scaffold_dir in [Ss]*/; do
+    scaffold_name=$(basename "$scaffold_dir")
+    
+    dup_rate=$(awk '/Duplication Rate/ {print $3}' "$scaffold_dir/$scaffold_name.log") #Retrieve duplication rate
+
+    echo -e "${scaffold_name}\t${dup_rate}" >> dup_rate_summary.txt
+  done
+  #calculate mean over all scaffolds
+  mean=$(awk 'NR>1 {sum += $2; n++} END {print sum/n}' dup_rate_summary.txt)
+cd ..
+echo -e "$sample_dir\t$mean" >> mean_dup_rate.txt
+done
+```
+
+Calculate mean duplication rate for Scaffolds 1-16:
+
+```
+echo -e "Sample\tScaffold1-16_duplication_rate" > scaffold1-16_mean_dup_rate.txt
+
+for dir in ./sample*; do
+  #echo $dir
+  dup_rate=$(cat $dir/dup_rate_summary.txt | grep Scaffold | awk 'NR>1 {sum += $2; n++} END {print sum/n}')
+  echo -e "${dir}\t${dup_rate}" >> Scaffold1-16_mean_dup_rate.txt
+done
+```
+
+### Merge bams after Dedup
+
+```
+start_dir=/scratch/midway2/rozennpineau/herbarium/bams/final/sorted/split/dedup
+
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/rpineau/bamtools
+module load samtools
+
+ulimit -n 4096 # increase upper limit of number of files that can be opened at once
+
+cd $start_dir
+for dir in ./*; do #list directories one level down only 
+    cd $dir
+
+    realpath */[Ss]*rmdup.bam > bams_to_merge.list
+    echo "merging $dir..."
+    bamtools merge -list bams_to_merge.list -out $dir.scaffolds.dedup.bam
+    samtools index $dir.scaffolds.dedup.bam #index
+
+    cd ..
 done
 ```
