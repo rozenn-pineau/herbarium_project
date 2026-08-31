@@ -108,8 +108,6 @@ for r1 in *.unmerged.sorted.bam; do
 
 done
 
-
-
 ```
 
 
