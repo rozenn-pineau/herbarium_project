@@ -208,48 +208,37 @@ Lane 2
 27G -rw-rw-r-- 1 rozennpineau rozennpineau 27G Sep  5 17:26 unmatched_R1.fastq.gz
 
 
-## Checking the quality with fastp
+## Raw reads coverage
 
-Parallelized version of the script.
+Calculate the number of reads per sample using AWK. 
+
+!! This is for _R1 read only, multiply by 2 to obtain both R1 and R2/.
 
 ```
 #!/bin/bash
-#SBATCH --job-name=fastp
-#SBATCH --output=fastp.out
-#SBATCH --error=fastp.err
-#SBATCH --time=36:00:00
+#SBATCH --job-name=nb_bp_awk
+#SBATCH --output=nb_bp_awk.out
+#SBATCH --error=nb_bp_awk.err
+#SBATCH --time=10:00:00
 #SBATCH --partition=broadwl
 #SBATCH --account=pi-kreiner
-#SBATCH --nodes=4
-#SBATCH --ntasks-per-node=5
-#SBATCH --mem-per-cpu=10G
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=10GB
 
-# activate conda
 module load python/anaconda-2021.05
 source /software/python-anaconda-2021.05-el7-x86_64/etc/profile.d/conda.sh
-conda activate /project/kreiner/jsmontgomery/anaconda/fastp
+conda activate /project/kreiner/rpineau/seqkit/
 
-WORKDIR=/scratch/midway2/rozennpineau/herbarium/batch2/demuxed
-cd $WORKDIR
+cd /scratch/midway2/rozennpineau/herbarium/batch2/demuxed
 
-run_fastp() {
-    prefx=${1%_R1.fastq.gz}
+echo -e "sample\tnum_base_pairs" > nb_bp_per_fastq_R1.txt
 
-    fastp \
-        --in1 ${prefx}_R1.fastq.gz \
-        --in2 ${prefx}_R2.fastq.gz \
-        --out1 ${prefx}_R1.unmerged.fq.gz \
-        --out2 ${prefx}_R2.unmerged.fq.gz \
-        --merge \
-        --merged_out ${prefx}.collapsed.fq.gz \
-        --html ${prefx}.html \
-        --json ${prefx}.json \
-        --thread 2
-}
+for fq in *_R1.fastq.gz; do
 
-export -f run_fastp
+        samp=${fq%_R1.fastq.gz}
+        num=$(zcat $fq | awk 'NR%4==2 {sum += length($0)} END {print sum}')
+        echo -e "$samp\t$num" >> nb_bp_per_fastq_R1.txt
 
-parallel -j $SLURM_NTASKS_PER_NODE run_fastp ::: *_R1.fastq.gz
-
-
+done
 ```
