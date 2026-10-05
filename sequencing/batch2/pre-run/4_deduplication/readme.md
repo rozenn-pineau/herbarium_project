@@ -1,6 +1,6 @@
-### Prepping the reads for deduplication
+## Prepping the reads for deduplication
 
-## Prepping unmerged reads
+### Prepping unmerged reads
 
 script sent as a job array : first step is to make the list of files that need to go through the procedure
 
@@ -119,7 +119,7 @@ This create a lot of intermediate files.
 The final files to keep are ".prefixed.unmerged.sorted.bam" and ".prefixed.unmerged.sorted.bam.bai". 
 Remove "R.unmerged.sorted.bam" and "R.prefixed.unmerged.bam" when done. 
 
-## Prepping collapsed reads
+### Prepping collapsed reads
 
 (1) generate list of files to prep
 
@@ -217,7 +217,7 @@ echo "Submitting $N jobs"
 sbatch --array=1-$N%8 prep_collapsed_M_bams.sh
 ```
 
-### Merge prefixed bams
+## Merge prefixed bams
 (1) generate list of files to prep
 
 ```
@@ -320,7 +320,7 @@ echo "Submitting $n jobs"
 sbatch --array=1-$n%8 merge_bams_job_array.sh
 ```
 
-### Split into scaffolds
+## Split into scaffolds
 
 (1) Prepare list of bams to split
 ```
@@ -411,3 +411,94 @@ n=$(wc -l < $bams/bams_to_split.txt)
 echo "Submitting $n jobs"
 sbatch --array=1-$n%8 split_bams_to_scaffolds_job_array.sh
 ```
+
+This should create a folder per sample, with 1060 bams in each folder for each scaffold.
+
+## Run Dedup
+
+(1) Prepare list of bams to split
+```
+cd /scratch/midway2/rozennpineau/herbarium/batch2/bams/scaffolded
+for sample in sample_*; do
+    echo $sample
+done > samples_to_dedup.txt #536 lines
+```
+(2) Prepare script
+
+```
+#!/bin/bash
+#SBATCH --job-name=dedup
+#SBATCH --output=logs/dedup_%a.out
+#SBATCH --error=logs/dedup_%a.err
+#SBATCH --time=36:00:00
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=2GB
+
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/rpineau/dedup/
+
+module load samtools
+
+work_dir=/scratch/midway2/rozennpineau/herbarium/batch2/bams/scaffolded
+cd $work_dir
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAMPLE SELECTION
+# ─────────────────────────────────────────────────────────────────────────────
+samp=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $work_dir/samples_to_dedup.txt)
+cd $samp
+for bam in *.bam; do
+    name=${bam%.bam}
+    mkdir -p $name
+    dedup -i $bam -o ${name}
+done
+```
+(3) Submit job
+```
+sbatch --array=1-536%8 run_dedup_job_array.sh
+```
+
+## Merge bams after DeDup
+
+```
+start_dir=/scratch/midway2/rozennpineau/herbarium/batch2/bams/scaffolded
+
+#activate conda
+module load python/anaconda-2022.05
+source /software/python-anaconda-2022.05-el8-x86_64/etc/profile.d/conda.sh
+conda activate /project/kreiner/rpineau/bamtools
+module load samtools
+
+ulimit -n 4096 # increase upper limit of number of files that can be opened at once
+
+cd $start_dir
+for dir in ./*; do #list directories one level down only 
+    cd $dir
+
+    realpath */[Ss]*rmdup.bam > bams_to_merge.list
+    echo "merging $dir..."
+    bamtools merge -list bams_to_merge.list -out $dir.scaffolds.dedup.bam
+    samtools index $dir.scaffolds.dedup.bam #index
+
+    cd ..
+done
+```
+
+### Calculate Duplication rate
+
+```
+echo -e "Sample\tScaffold1-16_duplication_rate" > scaffold1-16_mean_dup_rate.txt
+
+for dir in ./sample_*; do
+  #echo $dir
+  dup_rate=$(cat $dir/dup_rate_summary.txt | grep Scaffold | awk 'NR>1 {sum += $2; n++} END {print sum/n}')
+  echo -e "${dir}\t${dup_rate}" >> Scaffold1-16_mean_dup_rate.txt
+done
+```
+
+duplication rates for samples on the one hand, and number of bp per mapped read before dedup on the other
+send those to Julia
