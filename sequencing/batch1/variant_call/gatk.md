@@ -13,135 +13,76 @@ It is a little more steps:
 
 ### Step 1. Prepare the reference (.fa + .fai + .dict)
 
-```
-module load gatk 
+See the readme in 2022_dataset for this step.
 
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+### Step 2. Split the reference genome into 5 MB intervals. 
 
-#create sequence dictionary and fai index 
-if [ ! -f ${ref%.fasta}.dict ]; then
-    echo "Creating sequence dictionary..."
-    gatk CreateSequenceDictionary -R ${ref}
-fi
-
-if [ ! -f ${ref}.fai ]; then
-    echo "Creating fasta index..."
-    samtools faidx ${ref}
-fi
-```
-This was very fast, the files were created in the reference directory directly. 
-
-### Step 2. Split the reference genome into 100kb intervals. 
-
-```
-# ─── step 2: split genome into 100kb intervals 
-
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
-workdir=/scratch/midway2/rozennpineau/herbarium/
-intervaldir=/scratch/midway3/rozennpineau/herbarium/ref_intervals
-
-# calculate number of 100kb windows from the fai index
-n_windows=$(awk '{sum += $2} END {printf "%d", sum/100000}' ${ref}.fai)
-
-
-echo "Splitting genome into 100kb windows..."
-gatk SplitIntervals \
-    -R ${ref} \
-    -O ${intervaldir} \
-    --scatter-count ${n_windows} \
-    --subdivision-mode INTERVAL_SUBDIVISION \
-    --interval-padding 0 
-
-
-#parameters options explained: 
-#--subdivision-mode INTERVAL_SUBDIVISION: simple scatter approach in which all output intervals have size equal to the total base count of the source list divided by the scatter count (except, possibly, in the last interval list).
-#--interval-padding 0 : Amount of padding (in bp) to add to each interval you are including
-#-L : genomic intervals over which to operate
-#scatter count: number of output interval files to split into
-
-
-# Count how many interval files were created
-n_intervals=$(ls ${intervaldir}/*.interval_list | wc -l)
-echo "[$(date)] Created ${n_intervals} interval files (~100kb each)"
-
-```
-This created 95 intervals (.list files). 
+See the readme in 2022_dataset for this step.
 
 ### Step 3. HaplotypeCaller - make GVCF files
 
 ```
-# ── 1. define variables
-bam_dir=/scratch/midway3/rozennpineau/herbarium/bams
-work_dir=/scratch/midway3/rozennpineau/herbarium/gvcf
-ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
-interval_dir=/scratch/midway3/rozennpineau/herbarium/ref_intervals
-log_dir=${work_dir}/logs
+#!/bin/bash
+#SBATCH --job-name=make_gvcfs
+#SBATCH --account=pi-kreiner
+#SBATCH --partition=caslake
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=24G
+#SBATCH --time=7:00:00
+#SBATCH --array=1-1%40     # one task per BAM, 40 running at once
+#SBATCH --output=logs/make_gvcfs_%A_%a.out
+#SBATCH --error=logs/make_gvcfs_%A_%a.err
 
+module load gatk samtools parallel
+
+#load directories
+main_dir=/scratch/midway3/rozennpineau/herbarium/batch1
+bam_dir=${main_dir}/bams
+work_dir=${main_dir}/gvcf
+ref=/project/kreiner/data/genome/Atub_193_hap2.fasta
+interval_dir=/scratch/midway3/rozennpineau/herbarium/ref_intervals_5MB
+log_dir=${work_dir}/logs
 mkdir -p ${work_dir}/tmp ${log_dir}
 
-# ── 2. build list of all sample×interval combinations
-combo_list=()
-for bam in ${bam_dir}/*.dedup.sorted.bam; do
-    for interval in ${interval_dir}/*.interval_list; do
-        combo_list+=("${bam}:::${interval}")  # combine with a separator
-    done
-done
+# one sample per array task
+bam=$(ls ${bam_dir}/*.scaffolds.dedup.sorted.bam | sed -n "${SLURM_ARRAY_TASK_ID}p")
+sample=$(basename ${bam} .scaffolds.dedup.sorted.bam)
+out_dir=${work_dir}/${sample}
+mkdir -p ${out_dir}
 
-# ── 3. export variables
-export work_dir ref log_dir
-
-# ── 4. define the per-sample per-interval function
 run_interval() {
-    combo=$1
-    bam="${combo%%:::*}"          # extract everything before :::
-    interval_file="${combo##*:::}" # extract everything after :::
-
-    sample=$(basename ${bam} .scaffolds.dedup.sorted.bam)
+    interval_file=$1
     interval_name=$(basename ${interval_file} .interval_list)
-    out_dir=${work_dir}/${sample}
-    mkdir -p ${out_dir}
     out_gvcf=${out_dir}/${sample}.${interval_name}.g.vcf.gz
     log_file=${log_dir}/${sample}.${interval_name}.log
 
-    # skip if already done
-    if [ -f ${out_gvcf} ]; then
-        echo "[$(date)] Skipping ${sample} ${interval_name} — already exists"
-        return 0
-    fi
+    # done only if the index exists (written last)
+    [ -f ${out_gvcf}.tbi ] && return 0
+    rm -f ${out_gvcf} ${out_gvcf}.tbi
 
-    echo "[$(date)] Running ${sample} on interval ${interval_name}..."
-    gatk HaplotypeCaller \
-        -R ${ref} \
-        -I ${bam} \
-        -O ${out_gvcf} \
-        -L ${interval_file} \
-        -ERC BP_RESOLUTION \
+    gatk --java-options "-Xmx5g" HaplotypeCaller \
+        -R ${ref} -I ${bam} -O ${out_gvcf} -L ${interval_file} \
+        -ERC GVCF \
         --tmp-dir ${work_dir}/tmp \
-        --native-pair-hmm-threads 2 \
+        --native-pair-hmm-threads 1 \
         --max-alternate-alleles 4 \
         > ${log_file} 2>&1
-
-
-    if [ $? -eq 0 ]; then
-        echo "[$(date)] Finished ${sample} ${interval_name}"
-    else
-        echo "[$(date)] ERROR on ${sample} ${interval_name}" >&2
-        return 1
-    fi
 }
-
 export -f run_interval
+export work_dir ref log_dir bam sample out_dir
 
-# ── 5. run parallel over all sample×interval combinations
-printf '%s\n' "${combo_list[@]}" | \
-    parallel --jobs ${SLURM_CPUS_PER_TASK} \
-             --joblog ${log_dir}/parallel_joblog.txt \
-             --halt soon,fail=1 \
-             run_interval {}
+parallel --jobs ${SLURM_CPUS_PER_TASK} --retries 2 \
+         --joblog ${log_dir}/joblog_${sample}.txt \
+         run_interval ::: ${interval_dir}/*.interval_list
 
-echo "[$(date)] All jobs complete."
+#compare number of shards expected versus obtained and report error
+n_ok=$(ls ${out_dir}/*.g.vcf.gz.tbi | wc -l)
+n_expected=$(ls ${interval_dir}/*.interval_list | wc -l)
+[ "$n_ok" -eq "$n_expected" ] || { echo "ERROR: ${n_ok}/${n_expected} shards done" >&2; exit 1; }
 
-
+echo "[$(date)] ${sample} complete."
 ```
 
 
