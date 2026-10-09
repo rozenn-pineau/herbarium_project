@@ -488,7 +488,7 @@ for dir in ./*; do #list directories one level down only
 done
 ```
 
-### Calculate Duplication rate
+## Calculate Duplication rate
 
 ```
 echo -e "Sample\tScaffold1-16_duplication_rate" > scaffold1-16_mean_dup_rate.txt
@@ -502,3 +502,68 @@ done
 
 duplication rates for samples on the one hand, and number of bp per mapped read before dedup on the other
 send those to Julia
+
+## Calculate coverage after deduplication
+
+Run as a job array. 
+
+```
+#!/bin/bash
+#SBATCH --job-name=calc_bp
+#SBATCH --output=logs/calc_bp_%a.out
+#SBATCH --error=logs/calc_bp_%a.err
+#SBATCH --time=02:00:00              
+#SBATCH --partition=caslake
+#SBATCH --account=pi-kreiner
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=2
+#SBATCH --mem-per-cpu=8G
+
+module load samtools
+
+path=/scratch/midway2/rozennpineau/herbarium/batch2/bams/dedup
+mkdir -p $path/logs $path/coverage_results
+cd $path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAMPLE SELECTION
+# ─────────────────────────────────────────────────────────────────────────────
+bam=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $path/bams_to_calc.txt)
+name=${bam%.scaffolds.dedup.bam}
+
+echo "Array task $SLURM_ARRAY_TASK_ID processing: $name"
+
+if ! samtools quickcheck $bam 2>/dev/null; then
+    echo "ERROR: missing or corrupted input: $bam"
+    exit 1
+fi
+
+# # ─────────────────────────────────────────────────────────────────────────────
+# CALCULATE TOTAL BASE PAIRS MAPPED
+# "bases mapped (cigar)" is the most accurate measure of base pairs mapped —
+# it counts only bases that are part of the actual alignment, excluding
+# soft-clipped bases that are in the read but not aligned to the reference.
+# ─────────────────────────────────────────────────────────────────────────────
+bases=$(samtools stats -@ $SLURM_CPUS_PER_TASK $bam \
+    | grep "^SN" \
+    | grep "bases mapped (cigar):" \
+    | cut -f 3)
+
+echo -e "$name\t$bases" > $path/coverage_results/${name}.bp.txt
+echo "Finished $name: $bases base pairs mapped."
+
+```
+
+Starting job :
+
+```
+sbatch --array=1-536%8 calc_bp_after_dedup.sh
+
+```
+
+Combine all samples in one file: 
+
+```
+cat $path/coverage_results/*.coverage.txt >> nb_bp_after_dedup.txt
+```
